@@ -1,5 +1,5 @@
 /*!
- * jQuery JavaScript Library v1.11.0-beta1
+ * jQuery JavaScript Library v1.11.0-beta2
  * http://jquery.com/
  *
  * Includes Sizzle.js
@@ -9,7 +9,7 @@
  * Released under the MIT license
  * http://jquery.org/license
  *
- * Date: 2013-09-19T20:04Z
+ * Date: 2013-11-15T15:58Z
  */
 
 (function ( window, factory ) {
@@ -62,14 +62,13 @@ var support = {};
 
 
 var
-
 	// Map over jQuery in case of overwrite
 	_jQuery = window.jQuery,
 
 	// Map over the $ in case of overwrite
 	_$ = window.$,
 
-	version = "1.11.0-beta1",
+	version = "1.11.0-beta2",
 
 	// Define a local copy of jQuery
 	jQuery = function( selector, context ) {
@@ -109,13 +108,13 @@ jQuery.fn = jQuery.prototype = {
 	// Get the Nth element in the matched element set OR
 	// Get the whole matched element set as a clean array
 	get: function( num ) {
-		return num == null ?
+		return num != null ?
 
 			// Return a 'clean' array
-			this.toArray() :
+			( num < 0 ? this[ num + this.length ] : this[ num ] ) :
 
 			// Return just the object
-			( num < 0 ? this[ this.length + num ] : this[ num ] );
+			slice.call( this );
 	},
 
 	// Take an array of elements and push it onto the stack
@@ -140,6 +139,12 @@ jQuery.fn = jQuery.prototype = {
 		return jQuery.each( this, callback, args );
 	},
 
+	map: function( callback ) {
+		return this.pushStack( jQuery.map(this, function( elem, i ) {
+			return callback.call( elem, i, elem );
+		}));
+	},
+
 	slice: function() {
 		return this.pushStack( slice.apply( this, arguments ) );
 	},
@@ -156,12 +161,6 @@ jQuery.fn = jQuery.prototype = {
 		var len = this.length,
 			j = +i + ( i < 0 ? len : 0 );
 		return this.pushStack( j >= 0 && j < len ? [ this[j] ] : [] );
-	},
-
-	map: function( callback ) {
-		return this.pushStack( jQuery.map(this, function( elem, i ) {
-			return callback.call( elem, i, elem );
-		}));
 	},
 
 	end: function() {
@@ -185,9 +184,10 @@ jQuery.extend = jQuery.fn.extend = function() {
 	// Handle a deep copy situation
 	if ( typeof target === "boolean" ) {
 		deep = target;
-		target = arguments[1] || {};
+
 		// skip the boolean and the target
-		i = 2;
+		target = arguments[ i ] || {};
+		i++;
 	}
 
 	// Handle case when target is a string or something (possible in deep copy)
@@ -196,9 +196,9 @@ jQuery.extend = jQuery.fn.extend = function() {
 	}
 
 	// extend jQuery itself if only one argument is passed
-	if ( length === i ) {
+	if ( i === length ) {
 		target = this;
-		--i;
+		i--;
 	}
 
 	for ( ; i < length; i++ ) {
@@ -245,6 +245,12 @@ jQuery.extend({
 
 	// Assume jQuery is ready without the ready module
 	isReady: true,
+
+	error: function( msg ) {
+		throw new Error( msg );
+	},
+
+	noop: function() {},
 
 	noConflict: function( deep ) {
 		if ( window.$ === jQuery ) {
@@ -328,18 +334,12 @@ jQuery.extend({
 
 	type: function( obj ) {
 		if ( obj == null ) {
-			return String( obj );
+			return obj + "";
 		}
 		return typeof obj === "object" || typeof obj === "function" ?
 			class2type[ toString.call(obj) ] || "object" :
 			typeof obj;
 	},
-
-	error: function( msg ) {
-		throw new Error( msg );
-	},
-
-	noop: function() {},
 
 	// Evaluates a script in a global context
 	// Workarounds based on findings by Jim Driscoll
@@ -492,23 +492,23 @@ jQuery.extend({
 		return first;
 	},
 
-	grep: function( elems, callback, inv ) {
-		var retVal,
-			ret = [],
+	grep: function( elems, callback, invert ) {
+		var callbackInverse,
+			matches = [],
 			i = 0,
-			length = elems.length;
-		inv = !!inv;
+			length = elems.length,
+			callbackExpect = !invert;
 
 		// Go through the array, only saving the items
 		// that pass the validator function
 		for ( ; i < length; i++ ) {
-			retVal = !!callback( elems[ i ], i );
-			if ( inv !== retVal ) {
-				ret.push( elems[ i ] );
+			callbackInverse = !callback( elems[ i ], i );
+			if ( callbackInverse !== callbackExpect ) {
+				matches.push( elems[ i ] );
 			}
 		}
 
-		return ret;
+		return matches;
 	},
 
 	// arg is for internal usage only
@@ -519,13 +519,13 @@ jQuery.extend({
 			isArray = isArraylike( elems ),
 			ret = [];
 
-		// Go through the array, translating each of the items to their
+		// Go through the array, translating each of the items to their new values
 		if ( isArray ) {
 			for ( ; i < length; i++ ) {
 				value = callback( elems[ i ], i, arg );
 
 				if ( value != null ) {
-					ret[ ret.length ] = value;
+					ret.push( value );
 				}
 			}
 
@@ -535,7 +535,7 @@ jQuery.extend({
 				value = callback( elems[ i ], i, arg );
 
 				if ( value != null ) {
-					ret[ ret.length ] = value;
+					ret.push( value );
 				}
 			}
 		}
@@ -577,7 +577,7 @@ jQuery.extend({
 	},
 
 	now: function() {
-		return ( new Date() ).getTime();
+		return +( new Date() );
 	},
 
 	// jQuery.support is not used in Core but other projects attach their
@@ -594,7 +594,7 @@ function isArraylike( obj ) {
 	var length = obj.length,
 		type = jQuery.type( obj );
 
-	if ( jQuery.isWindow( obj ) ) {
+	if ( type === "function" || jQuery.isWindow( obj ) ) {
 		return false;
 	}
 
@@ -602,20 +602,19 @@ function isArraylike( obj ) {
 		return true;
 	}
 
-	return type === "array" || type !== "function" &&
-		( length === 0 ||
-		typeof length === "number" && length > 0 && ( length - 1 ) in obj );
+	return type === "array" || length === 0 ||
+		typeof length === "number" && length > 0 && ( length - 1 ) in obj;
 }
 var Sizzle =
 /*!
- * Sizzle CSS Selector Engine v1.10.9
+ * Sizzle CSS Selector Engine v1.10.12
  * http://sizzlejs.com/
  *
  * Copyright 2013 jQuery Foundation, Inc. and other contributors
  * Released under the MIT license
  * http://jquery.org/license
  *
- * Date: 2013-09-12
+ * Date: 2013-11-13
  */
 (function( window ) {
 
@@ -1063,7 +1062,8 @@ isXML = Sizzle.isXML = function( elem ) {
  * @returns {Object} Returns the current document
  */
 setDocument = Sizzle.setDocument = function( node ) {
-	var doc = node ? node.ownerDocument || node : preferredDoc,
+	var hasCompare,
+		doc = node ? node.ownerDocument || node : preferredDoc,
 		parent = doc.defaultView;
 
 	// If no document and documentElement is available, return
@@ -1108,7 +1108,7 @@ setDocument = Sizzle.setDocument = function( node ) {
 	});
 
 	// Check if getElementsByClassName can be trusted
-	support.getElementsByClassName = assert(function( div ) {
+	support.getElementsByClassName = rnative.test( doc.getElementsByClassName ) && assert(function( div ) {
 		div.innerHTML = "<div class='a'></div><div class='a i'></div>";
 
 		// Support: Safari<4
@@ -1280,11 +1280,12 @@ setDocument = Sizzle.setDocument = function( node ) {
 
 	/* Contains
 	---------------------------------------------------------------------- */
+	hasCompare = rnative.test( docElem.compareDocumentPosition );
 
 	// Element contains another
 	// Purposefully does not implement inclusive descendent
 	// As in, an element does not contain itself
-	contains = rnative.test( docElem.contains ) || docElem.compareDocumentPosition ?
+	contains = hasCompare || rnative.test( docElem.contains ) ?
 		function( a, b ) {
 			var adown = a.nodeType === 9 ? a.documentElement : a,
 				bup = b && b.parentNode;
@@ -1309,7 +1310,7 @@ setDocument = Sizzle.setDocument = function( node ) {
 	---------------------------------------------------------------------- */
 
 	// Document order sorting
-	sortOrder = docElem.compareDocumentPosition ?
+	sortOrder = hasCompare ?
 	function( a, b ) {
 
 		// Flag for duplicate removal
@@ -1318,34 +1319,46 @@ setDocument = Sizzle.setDocument = function( node ) {
 			return 0;
 		}
 
-		var compare = b.compareDocumentPosition && a.compareDocumentPosition && a.compareDocumentPosition( b );
-
+		// Sort on method existence if only one input has compareDocumentPosition
+		var compare = !a.compareDocumentPosition - !b.compareDocumentPosition;
 		if ( compare ) {
-			// Disconnected nodes
-			if ( compare & 1 ||
-				(!support.sortDetached && b.compareDocumentPosition( a ) === compare) ) {
-
-				// Choose the first element that is related to our preferred document
-				if ( a === doc || contains(preferredDoc, a) ) {
-					return -1;
-				}
-				if ( b === doc || contains(preferredDoc, b) ) {
-					return 1;
-				}
-
-				// Maintain original order
-				return sortInput ?
-					( indexOf.call( sortInput, a ) - indexOf.call( sortInput, b ) ) :
-					0;
-			}
-
-			return compare & 4 ? -1 : 1;
+			return compare;
 		}
 
-		// Not directly comparable, sort on existence of method
-		return a.compareDocumentPosition ? -1 : 1;
+		// Calculate position if both inputs belong to the same document
+		compare = ( a.ownerDocument || a ) === ( b.ownerDocument || b ) ?
+			a.compareDocumentPosition( b ) :
+
+			// Otherwise we know they are disconnected
+			1;
+
+		// Disconnected nodes
+		if ( compare & 1 ||
+			(!support.sortDetached && b.compareDocumentPosition( a ) === compare) ) {
+
+			// Choose the first element that is related to our preferred document
+			if ( a === doc || a.ownerDocument === preferredDoc && contains(preferredDoc, a) ) {
+				return -1;
+			}
+			if ( b === doc || b.ownerDocument === preferredDoc && contains(preferredDoc, b) ) {
+				return 1;
+			}
+
+			// Maintain original order
+			return sortInput ?
+				( indexOf.call( sortInput, a ) - indexOf.call( sortInput, b ) ) :
+				0;
+		}
+
+		return compare & 4 ? -1 : 1;
 	} :
 	function( a, b ) {
+		// Exit early if the nodes are identical
+		if ( a === b ) {
+			hasDuplicate = true;
+			return 0;
+		}
+
 		var cur,
 			i = 0,
 			aup = a.parentNode,
@@ -1353,13 +1366,8 @@ setDocument = Sizzle.setDocument = function( node ) {
 			ap = [ a ],
 			bp = [ b ];
 
-		// Exit early if the nodes are identical
-		if ( a === b ) {
-			hasDuplicate = true;
-			return 0;
-
 		// Parentless nodes are either documents or disconnected
-		} else if ( !aup || !bup ) {
+		if ( !aup || !bup ) {
 			return a === doc ? -1 :
 				b === doc ? 1 :
 				aup ? -1 :
@@ -1492,6 +1500,10 @@ Sizzle.uniqueSort = function( results ) {
 			results.splice( duplicates[ j ], 1 );
 		}
 	}
+
+	// Clear input after sorting to release objects
+	// See https://github.com/jquery/sizzle/pull/225
+	sortInput = null;
 
 	return results;
 };
@@ -1947,7 +1959,7 @@ Expr = Sizzle.selectors = {
 
 				// Support: IE<8
 				// New HTML5 attribute values (e.g., "search") appear with elem.type === "text"
-				( (attr = elem.getAttribute("type")) == null || attr.toLowerCase() === elem.type );
+				( (attr = elem.getAttribute("type")) == null || attr.toLowerCase() === "text" );
 		},
 
 		// Position-in-collection
@@ -2884,7 +2896,7 @@ jQuery.fn.extend({
 		var cur,
 			i = 0,
 			l = this.length,
-			ret = [],
+			matched = [],
 			pos = rneedsContext.test( selectors ) || typeof selectors !== "string" ?
 				jQuery( selectors, context || this.context ) :
 				0;
@@ -2899,13 +2911,13 @@ jQuery.fn.extend({
 					cur.nodeType === 1 &&
 						jQuery.find.matchesSelector(cur, selectors)) ) {
 
-					cur = ret.push( cur );
+					matched.push( cur );
 					break;
 				}
 			}
 		}
 
-		return this.pushStack( ret.length > 1 ? jQuery.unique( ret ) : ret );
+		return this.pushStack( matched.length > 1 ? jQuery.unique( matched ) : matched );
 	},
 
 	// Determine the position of an element within
@@ -3146,7 +3158,7 @@ jQuery.Callbacks = function( options ) {
 				if ( list ) {
 					jQuery.each( arguments, function( _, arg ) {
 						var index;
-						while( ( index = jQuery.inArray( arg, list, index ) ) > -1 ) {
+						while ( ( index = jQuery.inArray( arg, list, index ) ) > -1 ) {
 							list.splice( index, 1 );
 							// Handle firing indexes
 							if ( firing ) {
@@ -3327,9 +3339,10 @@ jQuery.extend({
 				return function( value ) {
 					contexts[ i ] = this;
 					values[ i ] = arguments.length > 1 ? slice.call( arguments ) : value;
-					if( values === progressValues ) {
+					if ( values === progressValues ) {
 						deferred.notifyWith( contexts, values );
-					} else if ( !( --remaining ) ) {
+
+					} else if ( !(--remaining) ) {
 						deferred.resolveWith( contexts, values );
 					}
 				};
@@ -3446,7 +3459,6 @@ function completed() {
 		jQuery.ready();
 	}
 }
-
 
 jQuery.ready.promise = function( obj ) {
 	if ( !readyList ) {
@@ -3569,7 +3581,7 @@ jQuery(function() {
 
 
 
-(function () {
+(function() {
 	var div = document.createElement( "div" );
 
 	// Execute the test only if not already executed in another module.
@@ -3592,19 +3604,19 @@ jQuery(function() {
  * Determines whether an object can have data
  */
 jQuery.acceptData = function( elem ) {
-	// Do not set data on non-element because it will not be cleared (#8335).
-	if ( elem.nodeType && elem.nodeType !== 1 && elem.nodeType !== 9 ) {
-		return false;
-	}
+	var noData = jQuery.noData[ (elem.nodeName + " ").toLowerCase() ],
+		nodeType = +elem.nodeType || 1;
 
-	var noData = elem.nodeName && jQuery.noData[ elem.nodeName.toLowerCase() ];
+	// Do not set data on non-element DOM nodes because it will not be cleared (#8335).
+	return nodeType !== 1 && nodeType !== 9 ?
+		false :
 
-	// nodes accept data unless otherwise specified; rejection can be conditional
-	return !noData || noData !== true && elem.getAttribute("classid") === noData;
+		// Nodes accept data unless otherwise specified; rejection can be conditional
+		!noData || noData !== true && elem.getAttribute("classid") === noData;
 };
 
 
-var rbrace = /(?:\{[\s\S]*\}|\[[\s\S]*\])$/,
+var rbrace = /^(?:\{[\w\W]*\}|\[[\w\W]*\])$/,
 	rmultiDash = /([A-Z])/g;
 
 function dataAttr( elem, key, data ) {
@@ -3624,7 +3636,7 @@ function dataAttr( elem, key, data ) {
 					// Only convert to a number if it doesn't change the string
 					+data + "" === data ? +data :
 					rbrace.test( data ) ? jQuery.parseJSON( data ) :
-						data;
+					data;
 			} catch( e ) {}
 
 			// Make sure we set the data so it isn't changed later
@@ -3655,7 +3667,7 @@ function isEmptyDataObject( obj ) {
 	return true;
 }
 
-function internalData( elem, name, data, pvt /* Internal Use Only */ ){
+function internalData( elem, name, data, pvt /* Internal Use Only */ ) {
 	if ( !jQuery.acceptData( elem ) ) {
 		return;
 	}
@@ -3837,13 +3849,13 @@ function internalRemoveData( elem, name, pvt ) {
 jQuery.extend({
 	cache: {},
 
-	// The following elements throw uncatchable exceptions if you
-	// attempt to add expando properties to them.
+	// The following elements (space-suffixed to avoid Object.prototype collisions)
+	// throw uncatchable exceptions if you attempt to set expando properties
 	noData: {
-		"applet": true,
-		"embed": true,
-		// Ban all objects except for Flash (which handle expandos)
-		"object": "clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"
+		"applet ": true,
+		"embed ": true,
+		// ...but Flash objects (which have this classid) *can* handle expandos
+		"object ": "clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"
 	},
 
 	hasData: function( elem ) {
@@ -3871,10 +3883,9 @@ jQuery.extend({
 
 jQuery.fn.extend({
 	data: function( key, value ) {
-		var attrs, name,
-			data = null,
-			i = 0,
-			elem = this[0];
+		var i, name, data,
+			elem = this[0],
+			attrs = elem && elem.attributes;
 
 		// Special expections of .data basically thwart jQuery.access,
 		// so implement the relevant behavior ourselves
@@ -3885,8 +3896,8 @@ jQuery.fn.extend({
 				data = jQuery.data( elem );
 
 				if ( elem.nodeType === 1 && !jQuery._data( elem, "parsedAttrs" ) ) {
-					attrs = elem.attributes;
-					for ( ; i < attrs.length; i++ ) {
+					i = attrs.length;
+					while ( i-- ) {
 						name = attrs[i].name;
 
 						if ( name.indexOf("data-") === 0 ) {
@@ -3918,7 +3929,7 @@ jQuery.fn.extend({
 
 			// Gets one value
 			// Try to fetch any internally stored data first
-			elem ? dataAttr( elem, key, jQuery.data( elem, key ) ) : null;
+			elem ? dataAttr( elem, key, jQuery.data( elem, key ) ) : undefined;
 	},
 
 	removeData: function( key ) {
@@ -4051,7 +4062,7 @@ jQuery.fn.extend({
 		}
 		type = type || "fx";
 
-		while( i-- ) {
+		while ( i-- ) {
 			tmp = jQuery._data( elements[ i ], type + "queueHooks" );
 			if ( tmp && tmp.empty ) {
 				count++;
@@ -4131,7 +4142,7 @@ var rcheckableType = (/^(?:checkbox|radio)$/i);
 
 
 
-(function () {
+(function() {
 	var fragment = document.createDocumentFragment(),
 		div = document.createElement("div"),
 		input = document.createElement("input");
@@ -4169,7 +4180,7 @@ var rcheckableType = (/^(?:checkbox|radio)$/i);
 
 	// #11217 - WebKit loses check when the name is after the checked attribute
 	fragment.appendChild( div );
-	div.innerHTML = "<input type='radio' checked name='t'/>";
+	div.innerHTML = "<input type='radio' checked='checked' name='t'/>";
 
 	// Support: Safari 5.1, iOS 5.1, Android 4.x, Android 2.3
 	// old WebKit doesn't clone checked state correctly in fragments
@@ -4203,16 +4214,19 @@ var rcheckableType = (/^(?:checkbox|radio)$/i);
 })();
 
 
-(function () {
+(function() {
 	var i, eventName,
-		div = document.createElement("div" );
+		div = document.createElement( "div" );
 
-	// Support: IE<9 (lack submit/change bubble), Firefox 17+ (lack focusin event)
-	// Beware of CSP restrictions (https://developer.mozilla.org/en/Security/CSP)
+	// Support: IE<9 (lack submit/change bubble), Firefox 23+ (lack focusin event)
 	for ( i in { submit: true, change: true, focusin: true }) {
-		div.setAttribute( eventName = "on" + i, "t" );
+		eventName = "on" + i;
 
-		support[ i + "Bubbles" ] = eventName in window || div.attributes[ eventName ].expando === false;
+		if ( !(support[ i + "Bubbles" ] = eventName in window) ) {
+			// Beware of CSP restrictions (https://developer.mozilla.org/en/Security/CSP)
+			div.setAttribute( eventName, "t" );
+			support[ i + "Bubbles" ] = div.attributes[ eventName ].expando === false;
+		}
 	}
 
 	// Null elements to avoid leaks in IE.
@@ -4220,14 +4234,11 @@ var rcheckableType = (/^(?:checkbox|radio)$/i);
 })();
 
 
-var
-	rformElems = /^(?:input|select|textarea)$/i,
+var rformElems = /^(?:input|select|textarea)$/i,
 	rkeyEvent = /^key/,
 	rmouseEvent = /^(?:mouse|contextmenu)|click/,
 	rfocusMorph = /^(?:focusinfocus|focusoutblur)$/,
 	rtypenamespace = /^([^.]*)(?:\.(.+)|)$/;
-
-// Dependencies not needed as vars
 
 function returnTrue() {
 	return true;
@@ -4291,7 +4302,7 @@ jQuery.event = {
 		}
 
 		// Handle multiple events separated by a space
-		types = ( types || "" ).match( rnotwhite ) || [""];
+		types = ( types || "" ).match( rnotwhite ) || [ "" ];
 		t = types.length;
 		while ( t-- ) {
 			tmp = rtypenamespace.exec( types[t] ) || [];
@@ -4377,7 +4388,7 @@ jQuery.event = {
 		}
 
 		// Once for each type.namespace in types; type may be omitted
-		types = ( types || "" ).match( rnotwhite ) || [""];
+		types = ( types || "" ).match( rnotwhite ) || [ "" ];
 		t = types.length;
 		while ( t-- ) {
 			tmp = rtypenamespace.exec( types[t] ) || [];
@@ -4529,8 +4540,11 @@ jQuery.event = {
 
 			// Native handler
 			handle = ontype && cur[ ontype ];
-			if ( handle && jQuery.acceptData( cur ) && handle.apply && handle.apply( cur, data ) === false ) {
-				event.preventDefault();
+			if ( handle && handle.apply && jQuery.acceptData( cur ) ) {
+				event.result = handle.apply( cur, data );
+				if ( event.result === false ) {
+					event.preventDefault();
+				}
 			}
 		}
 		event.type = type;
@@ -5101,21 +5115,30 @@ if ( !support.changeBubbles ) {
 if ( !support.focusinBubbles ) {
 	jQuery.each({ focus: "focusin", blur: "focusout" }, function( orig, fix ) {
 
-		// Attach a single capturing handler while someone wants focusin/focusout
-		var attaches = 0,
-			handler = function( event ) {
+		// Attach a single capturing handler on the document while someone wants focusin/focusout
+		var handler = function( event ) {
 				jQuery.event.simulate( fix, event.target, jQuery.event.fix( event ), true );
 			};
 
 		jQuery.event.special[ fix ] = {
 			setup: function() {
-				if ( attaches++ === 0 ) {
-					document.addEventListener( orig, handler, true );
+				var doc = this.ownerDocument || this,
+					attaches = jQuery._data( doc, fix );
+
+				if ( !attaches ) {
+					doc.addEventListener( orig, handler, true );
 				}
+				jQuery._data( doc, fix, ( attaches || 0 ) + 1 );
 			},
 			teardown: function() {
-				if ( --attaches === 0 ) {
-					document.removeEventListener( orig, handler, true );
+				var doc = this.ownerDocument || this,
+					attaches = jQuery._data( doc, fix ) - 1;
+
+				if ( !attaches ) {
+					doc.removeEventListener( orig, handler, true );
+					jQuery._removeData( doc, fix );
+				} else {
+					jQuery._data( doc, fix, attaches );
 				}
 			}
 		};
@@ -5224,8 +5247,6 @@ jQuery.fn.extend({
 		}
 	}
 });
-// Require more than a few needed variables
-// Keep in mind that a dependency array cannot be used with CommonJS+AMD syntax
 
 
 function createSafeFragment( document ) {
@@ -5242,14 +5263,11 @@ function createSafeFragment( document ) {
 	return safeFrag;
 }
 
-var
-
-	nodeNames = "abbr|article|aside|audio|bdi|canvas|data|datalist|details|figcaption|figure|footer|" +
+var nodeNames = "abbr|article|aside|audio|bdi|canvas|data|datalist|details|figcaption|figure|footer|" +
 		"header|hgroup|mark|meter|nav|output|progress|section|summary|time|video",
 	rinlinejQuery = / jQuery\d+="(?:null|\d+)"/g,
 	rnoshimcache = new RegExp("<(?:" + nodeNames + ")[\\s/>]", "i"),
 	rleadingWhitespace = /^\s+/,
-
 	rxhtmlTag = /<(?!area|br|col|embed|hr|img|input|link|meta|param)(([\w:]+)[^>]*)\/>/gi,
 	rtagName = /<([\w:]+)/,
 	rtbody = /<tbody/i,
@@ -5282,8 +5300,6 @@ var
 wrapMap.optgroup = wrapMap.option;
 wrapMap.tbody = wrapMap.tfoot = wrapMap.colgroup = wrapMap.caption = wrapMap.thead;
 wrapMap.th = wrapMap.td;
-
-// Dependencies not needed as variables
 
 function getAll( context, tag ) {
 	var elems, elem,
@@ -5529,7 +5545,7 @@ jQuery.extend({
 					tmp = tmp || safe.appendChild( context.createElement("div") );
 
 					// Deserialize a standard representation
-					tag = ( rtagName.exec( elem ) || ["", ""] )[1].toLowerCase();
+					tag = (rtagName.exec( elem ) || [ "", "" ])[ 1 ].toLowerCase();
 					wrap = wrapMap[ tag ] || wrapMap._default;
 
 					tmp.innerHTML = wrap[1] + elem.replace( rxhtmlTag, "<$1></$2>" ) + wrap[2];
@@ -5774,7 +5790,7 @@ jQuery.fn.extend({
 		dataAndEvents = dataAndEvents == null ? false : dataAndEvents;
 		deepDataAndEvents = deepDataAndEvents == null ? dataAndEvents : deepDataAndEvents;
 
-		return this.map( function () {
+		return this.map(function() {
 			return jQuery.clone( this, dataAndEvents, deepDataAndEvents );
 		});
 	},
@@ -5795,7 +5811,7 @@ jQuery.fn.extend({
 			if ( typeof value === "string" && !rnoInnerhtml.test( value ) &&
 				( support.htmlSerialize || !rnoshimcache.test( value )  ) &&
 				( support.leadingWhitespace || !rleadingWhitespace.test( value ) ) &&
-				!wrapMap[ ( rtagName.exec( value ) || ["", ""] )[1].toLowerCase() ] ) {
+				!wrapMap[ (rtagName.exec( value ) || [ "", "" ])[ 1 ].toLowerCase() ] ) {
 
 				value = value.replace( rxhtmlTag, "<$1></$2>" );
 
@@ -6021,7 +6037,7 @@ function defaultDisplay( nodeName ) {
 }
 
 
-(function () {
+(function() {
 	var a, shrinkWrapBlocksVal,
 		div = document.createElement( "div" ),
 		divReset =
@@ -6050,7 +6066,7 @@ function defaultDisplay( nodeName ) {
 	// Null elements to avoid leaks in IE.
 	a = div = null;
 
-	support.shrinkWrapBlocks = function () {
+	support.shrinkWrapBlocks = function() {
 		var body, container, div, containerStyles;
 
 		if ( shrinkWrapBlocksVal == null ) {
@@ -6106,7 +6122,7 @@ if ( window.getComputedStyle ) {
 		var width, minWidth, maxWidth, ret,
 			style = elem.style;
 
-		computed = computed || getStyles( elem ),
+		computed = computed || getStyles( elem );
 
 		// getPropertyValue is only needed for .css('filter') in IE9, see #12537
 		ret = computed ? computed.getPropertyValue( name ) || computed[ name ] : undefined;
@@ -6139,7 +6155,11 @@ if ( window.getComputedStyle ) {
 			}
 		}
 
-		return ret;
+		// Support: IE
+		// IE returns zIndex value as an integer.
+		return ret === undefined ?
+			ret :
+			ret + "";
 	};
 } else if ( document.documentElement.currentStyle ) {
 	getStyles = function( elem ) {
@@ -6187,14 +6207,46 @@ if ( window.getComputedStyle ) {
 			}
 		}
 
-		return ret === "" ? "auto" : ret;
+		// Support: IE
+		// IE returns zIndex value as an integer.
+		return ret === undefined ?
+			ret :
+			ret + "" || "auto";
 	};
 }
 
 
 
 
-(function () {
+function addGetHookIf( conditionFn, hookFn ) {
+	// Define the hook, we'll check on the first run if it's really needed.
+	return {
+		get: function() {
+			var condition = conditionFn();
+
+			if ( condition == null ) {
+				// The test was not ready at this point; screw the hook this time
+				// but check again when needed next time.
+				return;
+			}
+
+			if ( condition ) {
+				// Hook not needed (or it's not possible to use it due to missing dependency),
+				// remove it.
+				// Since there are no other hooks for marginRight, remove the whole object.
+				delete this.get;
+				return;
+			}
+
+			// Hook needed; redefine it so that the support test is not executed again.
+
+			return (this.get = hookFn).apply( this, arguments );
+		}
+	};
+}
+
+
+(function() {
 	var a, reliableHiddenOffsetsVal, boxSizingVal, boxSizingReliableVal,
 		pixelPositionVal, reliableMarginRightVal,
 		div = document.createElement( "div" ),
@@ -6224,7 +6276,6 @@ if ( window.getComputedStyle ) {
 
 	// Null elements to avoid leaks in IE.
 	a = div = null;
-
 
 	jQuery.extend(support, {
 		reliableHiddenOffsets: function() {
@@ -6381,34 +6432,6 @@ if ( window.getComputedStyle ) {
 })();
 
 
-function addGetHookIf( conditionFn, hookFn ) {
-	// Define the hook, we'll check on the first run if it's really needed.
-	return {
-		get: function() {
-			var condition = conditionFn();
-
-			if ( condition == null ) {
-				// The test was not ready at this point; screw the hook this time
-				// but check again when needed next time.
-				return;
-			}
-
-			if ( condition ) {
-				// Hook not needed (or it's not possible to use it due to missing dependency),
-				// remove it.
-				// Since there are no other hooks for marginRight, remove the whole object.
-				delete this.get;
-				return;
-			}
-
-			// Hook needed; redefine it so that the support test is not executed again.
-
-			return (this.get = hookFn).apply( this, arguments );
-		}
-	};
-}
-
-
 // A method for quickly swapping in/out CSS properties to get correct calculations.
 jQuery.swap = function( elem, options, callback, args ) {
 	var ret, name,
@@ -6429,14 +6452,10 @@ jQuery.swap = function( elem, options, callback, args ) {
 
 	return ret;
 };
-// Require more than a few needed variables
-// Keep in mind that a dependency array cannot be used with CommonJS+AMD syntax
 
 
 var
-	// This format is here to facilitate easy removal when building
-
-	ralpha = /alpha\([^)]*\)/i,
+		ralpha = /alpha\([^)]*\)/i,
 	ropacity = /opacity\s*=\s*([^)]*)/,
 
 	// swappable if display is none or starts with table except "table", "table-cell", or "table-caption"
@@ -6453,7 +6472,6 @@ var
 
 	cssPrefixes = [ "Webkit", "O", "Moz", "ms" ];
 
-// Dependencies not needed as vars // contains
 
 // return a css property mapped to a potentially vendor prefixed property
 function vendorPropName( style, name ) {
@@ -6706,9 +6724,12 @@ jQuery.extend({
 			// If a hook was provided, use that value, otherwise just set the specified value
 			if ( !hooks || !("set" in hooks) || (value = hooks.set( elem, value, extra )) !== undefined ) {
 
-				// Wrapped to prevent IE from throwing errors when 'invalid' values are provided
-				// Fixes bug #5509
+				// Support: IE
+				// Swallow errors from 'invalid' CSS values (#5509)
 				try {
+					// Support: Chrome, Safari
+					// Setting style to blank string required to delete "style: x !important;"
+					style[ name ] = "";
 					style[ name ] = value;
 				} catch(e) {}
 			}
@@ -6833,7 +6854,7 @@ if ( !support.opacity ) {
 }
 
 jQuery.cssHooks.marginRight = addGetHookIf( support.reliableMarginRight,
-	function ( elem, computed ) {
+	function( elem, computed ) {
 		if ( computed ) {
 			// WebKit Bug 13343 - getComputedStyle returns wrong value for margin-right
 			// Work around by temporarily setting element display to inline-block
@@ -7015,7 +7036,7 @@ jQuery.easing = {
 		return p;
 	},
 	swing: function( p ) {
-		return 0.5 - Math.cos( p*Math.PI ) / 2;
+		return 0.5 - Math.cos( p * Math.PI ) / 2;
 	}
 };
 
@@ -7028,14 +7049,13 @@ jQuery.fx.step = {};
 
 
 var
-
 	fxNow, timerId,
 	rfxtypes = /^(?:toggle|show|hide)$/,
 	rfxnum = new RegExp( "^(?:([+-])=|)(" + pnum + ")([a-z%]*)$", "i" ),
 	rrun = /queueHooks$/,
 	animationPrefilters = [ defaultPrefilter ],
 	tweeners = {
-		"*": [function( prop, value ) {
+		"*": [ function( prop, value ) {
 			var tween = this.createTween( prop, value ),
 				target = tween.cur(),
 				parts = rfxnum.exec( value ),
@@ -7082,10 +7102,8 @@ var
 			}
 
 			return tween;
-		}]
+		} ]
 	};
-
-// Dependencies not needed as vars
 
 // Animations created synchronously will run synchronously
 function createFxNow() {
@@ -7103,8 +7121,8 @@ function genFx( type, includeWidth ) {
 
 	// if we include width, step value is 1 to do all cssExpand values,
 	// if we don't include width, step value is 2 to skip over Left and Right
-	includeWidth = includeWidth? 1 : 0;
-	for( ; i < 4 ; i += 2 - includeWidth ) {
+	includeWidth = includeWidth ? 1 : 0;
+	for ( ; i < 4 ; i += 2 - includeWidth ) {
 		which = cssExpand[ i ];
 		attrs[ "margin" + which ] = attrs[ "padding" + which ] = type;
 	}
@@ -7115,7 +7133,6 @@ function genFx( type, includeWidth ) {
 
 	return attrs;
 }
-
 
 function createTween( value, prop, animation ) {
 	var tween,
@@ -7204,7 +7221,6 @@ function defaultPrefilter( elem, props, opts ) {
 			});
 		}
 	}
-
 
 	// show/hide pass
 	for ( prop in props ) {
@@ -7675,7 +7691,7 @@ jQuery.fn.delay = function( time, type ) {
 };
 
 
-(function () {
+(function() {
 	var a, input, select, opt,
 		div = document.createElement("div" );
 
@@ -7781,7 +7797,7 @@ jQuery.fn.extend({
 			} else if ( typeof val === "number" ) {
 				val += "";
 			} else if ( jQuery.isArray( val ) ) {
-				val = jQuery.map(val, function ( value ) {
+				val = jQuery.map( val, function( value ) {
 					return value == null ? "" : value + "";
 				});
 			}
@@ -8477,39 +8493,48 @@ var rquery = (/\?/);
 
 
 
-var rvalidchars = /^[\],:{}\s]*$/,
-	rvalidbraces = /(?:^|:|,)(?:\s*\[)+/g,
-	rvalidescape = /\\(?:["\\\/bfnrt]|u[\da-fA-F]{4})/g,
-	rvalidtokens = /"[^"\\\r\n]*"|true|false|null|-?(?:\d+\.|)\d+(?:[eE][+-]?\d+|)/g;
+var rvalidtokens = /(,)|(\[|{)|(}|])|"(?:[^"\\\r\n]|\\["\\\/bfnrt]|\\u[\da-fA-F]{4})*"\s*:?|true|false|null|-?(?!0\d)\d+(?:\.\d+|)(?:[eE][+-]?\d+|)/g;
 
 jQuery.parseJSON = function( data ) {
 	// Attempt to parse using the native JSON parser first
 	if ( window.JSON && window.JSON.parse ) {
-		return window.JSON.parse( data );
+		// Support: Android 2.3
+		// Workaround failure to string-cast null input
+		return window.JSON.parse( data + "" );
 	}
 
-	if ( data === null ) {
-		return data;
-	}
+	var requireNonComma,
+		depth = null,
+		str = jQuery.trim( data + "" );
 
-	if ( typeof data === "string" ) {
+	// Guard against invalid (and possibly dangerous) input by ensuring that nothing remains
+	// after removing valid tokens
+	return str && !jQuery.trim( str.replace( rvalidtokens, function( token, comma, open, close ) {
 
-		// Make sure leading/trailing whitespace is removed (IE can't handle it)
-		data = jQuery.trim( data );
-
-		if ( data ) {
-			// Make sure the incoming data is actual JSON
-			// Logic borrowed from http://json.org/json2.js
-			if ( rvalidchars.test( data.replace( rvalidescape, "@" )
-				.replace( rvalidtokens, "]" )
-				.replace( rvalidbraces, "")) ) {
-
-				return ( new Function( "return " + data ) )();
-			}
+		// Force termination if we see a misplaced comma
+		if ( requireNonComma && comma ) {
+			depth = 0;
 		}
-	}
 
-	jQuery.error( "Invalid JSON: " + data );
+		// Perform no more replacements after returning to outermost depth
+		if ( depth === 0 ) {
+			return token;
+		}
+
+		// Commas must not follow "[", "{", or ","
+		requireNonComma = open || comma;
+
+		// Determine new depth
+		// array/object open ("[" or "{"): depth += true - false (increment)
+		// array/object close ("]" or "}"): depth += false - true (decrement)
+		// other cases ("," or primitive): depth += true - true (numeric cast)
+		depth += !close - !open;
+
+		// Remove this token
+		return "";
+	}) ) ?
+		( Function( "return " + str ) )() :
+		jQuery.error( "Invalid JSON: " + data );
 };
 
 
@@ -8522,7 +8547,7 @@ jQuery.parseXML = function( data ) {
 	try {
 		if ( window.DOMParser ) { // Standard
 			tmp = new DOMParser();
-			xml = tmp.parseFromString( data , "text/xml" );
+			xml = tmp.parseFromString( data, "text/xml" );
 		} else { // IE
 			xml = new ActiveXObject( "Microsoft.XMLDOM" );
 			xml.async = "false";
@@ -8550,7 +8575,7 @@ var
 	rlocalProtocol = /^(?:about|app|app-storage|.+-extension|file|res|widget):$/,
 	rnoContent = /^(?:GET|HEAD)$/,
 	rprotocol = /^\/\//,
-	rurl = /^([\w.+-]+:)(?:\/\/([^\/?#:]*)(?::(\d+)|)|)/,
+	rurl = /^([\w.+-]+:)(?:\/\/(?:[^\/?#]*@|)([^\/?#:]*)(?::(\d+)|)|)/,
 
 	/* Prefilters
 	 * 1) They are useful to introduce custom dataTypes (see ajax/jsonp.js for an example)
@@ -8631,7 +8656,7 @@ function inspectPrefiltersOrTransports( structure, options, originalOptions, jqX
 		inspected[ dataType ] = true;
 		jQuery.each( structure[ dataType ] || [], function( _, prefilterOrFactory ) {
 			var dataTypeOrTransport = prefilterOrFactory( options, originalOptions, jqXHR );
-			if( typeof dataTypeOrTransport === "string" && !seekingTransport && !inspected[ dataTypeOrTransport ] ) {
+			if ( typeof dataTypeOrTransport === "string" && !seekingTransport && !inspected[ dataTypeOrTransport ] ) {
 				options.dataTypes.unshift( dataTypeOrTransport );
 				inspect( dataTypeOrTransport );
 				return false;
@@ -8664,7 +8689,6 @@ function ajaxExtend( target, src ) {
 	return target;
 }
 
-
 /* Handles responses to an ajax request:
  * - finds the right dataType (mediates between content-type and expected dataType)
  * - returns the corresponding response
@@ -8675,7 +8699,7 @@ function ajaxHandleResponses( s, jqXHR, responses ) {
 		dataTypes = s.dataTypes;
 
 	// Remove auto dataType and get content-type in the process
-	while( dataTypes[ 0 ] === "*" ) {
+	while ( dataTypes[ 0 ] === "*" ) {
 		dataTypes.shift();
 		if ( ct === undefined ) {
 			ct = s.mimeType || jqXHR.getResponseHeader("Content-Type");
@@ -9041,7 +9065,7 @@ jQuery.extend({
 		s.type = options.method || options.type || s.method || s.type;
 
 		// Extract dataTypes list
-		s.dataTypes = jQuery.trim( s.dataType || "*" ).toLowerCase().match( rnotwhite ) || [""];
+		s.dataTypes = jQuery.trim( s.dataType || "*" ).toLowerCase().match( rnotwhite ) || [ "" ];
 
 		// A cross-domain request is in order when we have a protocol:host:port mismatch
 		if ( s.crossDomain == null ) {
@@ -9327,8 +9351,8 @@ jQuery.each( [ "get", "post" ], function( i, method ) {
 });
 
 // Attach a bunch of functions for handling common AJAX events
-jQuery.each( [ "ajaxStart", "ajaxStop", "ajaxComplete", "ajaxError", "ajaxSuccess", "ajaxSend" ], function( i, type ){
-	jQuery.fn[ type ] = function( fn ){
+jQuery.each( [ "ajaxStart", "ajaxStop", "ajaxComplete", "ajaxError", "ajaxSuccess", "ajaxSend" ], function( i, type ) {
+	jQuery.fn[ type ] = function( fn ) {
 		return this.on( type, fn );
 	};
 });
@@ -9503,25 +9527,25 @@ jQuery.fn.extend({
 		return jQuery.param( this.serializeArray() );
 	},
 	serializeArray: function() {
-		return this.map(function(){
+		return this.map(function() {
 			// Can add propHook for "elements" to filter or add form elements
 			var elements = jQuery.prop( this, "elements" );
 			return elements ? jQuery.makeArray( elements ) : this;
 		})
-		.filter(function(){
+		.filter(function() {
 			var type = this.type;
 			// Use .is(":disabled") so that fieldset[disabled] works
 			return this.name && !jQuery( this ).is( ":disabled" ) &&
 				rsubmittable.test( this.nodeName ) && !rsubmitterTypes.test( type ) &&
 				( this.checked || !rcheckableType.test( type ) );
 		})
-		.map(function( i, elem ){
+		.map(function( i, elem ) {
 			var val = jQuery( this ).val();
 
 			return val == null ?
 				null :
 				jQuery.isArray( val ) ?
-					jQuery.map( val, function( val ){
+					jQuery.map( val, function( val ) {
 						return { name: elem.name, value: val.replace( rCRLF, "\r\n" ) };
 					}) :
 					{ name: elem.name, value: val.replace( rCRLF, "\r\n" ) };
@@ -9530,84 +9554,63 @@ jQuery.fn.extend({
 });
 
 
-var xhrCallbacks, xhrSupported,
-	xhrId = 0,
-	// #5280: Internet Explorer will keep connections alive if we don't abort on unload
-	xhrOnUnloadAbort = window.ActiveXObject && function() {
-		// Abort all pending requests
-		var key;
-		for ( key in xhrCallbacks ) {
-			xhrCallbacks[ key ]( undefined, true );
-		}
-	};
-
-// Functions to create xhrs
-function createStandardXHR() {
-	try {
-		return new window.XMLHttpRequest();
-	} catch( e ) {}
-}
-
-function createActiveXHR() {
-	try {
-		return new window.ActiveXObject("Microsoft.XMLHTTP");
-	} catch( e ) {}
-}
-
 // Create the request object
 // (This is still attached to ajaxSettings for backward compatibility)
-jQuery.ajaxSettings.xhr = window.ActiveXObject ?
-	/* Microsoft failed to properly
-	 * implement the XMLHttpRequest in IE7 (can't request local files),
-	 * so we use the ActiveXObject when it is available
-	 * Additionally XMLHttpRequest can be disabled in IE7/IE8 so
-	 * we need a fallback.
-	 */
+jQuery.ajaxSettings.xhr = window.ActiveXObject !== undefined ?
+	// Support: IE6+
+	// XHR cannot access local files, always use ActiveX for that case
 	function() {
 		return !this.isLocal && createStandardXHR() || createActiveXHR();
 	} :
 	// For all other browsers, use the standard XMLHttpRequest object
 	createStandardXHR;
 
+var xhrId = 0,
+	xhrCallbacks = {},
+	xhrSupported = jQuery.ajaxSettings.xhr();
+
+// Support: IE<10
+// Open requests must be manually aborted on unload (#5280)
+if ( window.ActiveXObject ) {
+	jQuery( window ).on( "unload", function() {
+		for ( var key in xhrCallbacks ) {
+			xhrCallbacks[ key ]( undefined, true );
+		}
+	});
+}
+
 // Determine support properties
-xhrSupported = jQuery.ajaxSettings.xhr();
 support.cors = !!xhrSupported && ( "withCredentials" in xhrSupported );
 xhrSupported = support.ajax = !!xhrSupported;
 
 // Create transport if the browser can provide an xhr
 if ( xhrSupported ) {
 
-	jQuery.ajaxTransport(function( s ) {
+	jQuery.ajaxTransport(function( options ) {
 		// Cross domain only allowed if supported through XMLHttpRequest
-		if ( !s.crossDomain || support.cors ) {
+		if ( !options.crossDomain || support.cors ) {
 
 			var callback;
 
 			return {
 				send: function( headers, complete ) {
-
-					// Get a new xhr
-					var handle, i,
-						xhr = s.xhr();
+					var i,
+						xhr = options.xhr(),
+						id = ++xhrId;
 
 					// Open the socket
-					// Passing null username, generates a login popup on Opera (#2865)
-					if ( s.username ) {
-						xhr.open( s.type, s.url, s.async, s.username, s.password );
-					} else {
-						xhr.open( s.type, s.url, s.async );
-					}
+					xhr.open( options.type, options.url, options.async, options.username, options.password );
 
 					// Apply custom fields if provided
-					if ( s.xhrFields ) {
-						for ( i in s.xhrFields ) {
-							xhr[ i ] = s.xhrFields[ i ];
+					if ( options.xhrFields ) {
+						for ( i in options.xhrFields ) {
+							xhr[ i ] = options.xhrFields[ i ];
 						}
 					}
 
 					// Override mime type if needed
-					if ( s.mimeType && xhr.overrideMimeType ) {
-						xhr.overrideMimeType( s.mimeType );
+					if ( options.mimeType && xhr.overrideMimeType ) {
+						xhr.overrideMimeType( options.mimeType );
 					}
 
 					// X-Requested-With header
@@ -9615,97 +9618,85 @@ if ( xhrSupported ) {
 					// akin to a jigsaw puzzle, we simply never set it to be sure.
 					// (it can always be set on a per-request basis or even using ajaxSetup)
 					// For same-domain requests, won't change header if already provided.
-					if ( !s.crossDomain && !headers["X-Requested-With"] ) {
+					if ( !options.crossDomain && !headers["X-Requested-With"] ) {
 						headers["X-Requested-With"] = "XMLHttpRequest";
 					}
 
-					// Need an extra try/catch for cross domain requests in Firefox 3
-					try {
-						for ( i in headers ) {
-							xhr.setRequestHeader( i, headers[ i ] );
+					// Set headers
+					for ( i in headers ) {
+						// Support: IE<9
+						// IE's ActiveXObject throws a 'Type Mismatch' exception when setting
+						// request header to a null-value.
+						//
+						// To keep consistent with other XHR implementations, cast the value
+						// to string and ignore `undefined`.
+						if ( headers[ i ] !== undefined ) {
+							xhr.setRequestHeader( i, headers[ i ] + "" );
 						}
-					} catch( err ) {}
+					}
 
 					// Do send the request
 					// This may raise an exception which is actually
 					// handled in jQuery.ajax (so no try/catch here)
-					xhr.send( ( s.hasContent && s.data ) || null );
+					xhr.send( ( options.hasContent && options.data ) || null );
 
 					// Listener
 					callback = function( _, isAbort ) {
-						var status, responseHeaders, statusText, responses;
+						var status, statusText, responses;
 
-						// Firefox throws exceptions when accessing properties
-						// of an xhr when a network error occurred
-						// http://helpful.knobs-dials.com/index.php/Component_returned_failure_code:_0x80040111_(NS_ERROR_NOT_AVAILABLE)
-						try {
+						// Was never called and is aborted or complete
+						if ( callback && ( isAbort || xhr.readyState === 4 ) ) {
+							// Clean up
+							delete xhrCallbacks[ id ];
+							callback = undefined;
+							xhr.onreadystatechange = jQuery.noop;
 
-							// Was never called and is aborted or complete
-							if ( callback && ( isAbort || xhr.readyState === 4 ) ) {
+							// Abort manually if needed
+							if ( isAbort ) {
+								if ( xhr.readyState !== 4 ) {
+									xhr.abort();
+								}
+							} else {
+								responses = {};
+								status = xhr.status;
 
-								// Only called once
-								callback = undefined;
-
-								// Do not keep as active anymore
-								if ( handle ) {
-									xhr.onreadystatechange = jQuery.noop;
-									if ( xhrOnUnloadAbort ) {
-										delete xhrCallbacks[ handle ];
-									}
+								// Support: IE<10
+								// Accessing binary-data responseText throws an exception
+								// (#11426)
+								if ( typeof xhr.responseText === "string" ) {
+									responses.text = xhr.responseText;
 								}
 
-								// If it's an abort
-								if ( isAbort ) {
-									// Abort it manually if needed
-									if ( xhr.readyState !== 4 ) {
-										xhr.abort();
-									}
-								} else {
-									responses = {};
-									status = xhr.status;
-									responseHeaders = xhr.getAllResponseHeaders();
-
-									// When requesting binary data, IE6-9 will throw an exception
-									// on any attempt to access responseText (#11426)
-									if ( typeof xhr.responseText === "string" ) {
-										responses.text = xhr.responseText;
-									}
-
-									// Firefox throws an exception when accessing
-									// statusText for faulty cross-domain requests
-									try {
-										statusText = xhr.statusText;
-									} catch( e ) {
-										// We normalize with Webkit giving an empty statusText
-										statusText = "";
-									}
-
-									// Filter status for non standard behaviors
-
-									// If the request is local and we have data: assume a success
-									// (success with no data won't get notified, that's the best we
-									// can do given current implementations)
-									if ( !status && s.isLocal && !s.crossDomain ) {
-										status = responses.text ? 200 : 404;
-									// IE - #1450: sometimes returns 1223 when it should be 204
-									} else if ( status === 1223 ) {
-										status = 204;
-									}
+								// Firefox throws an exception when accessing
+								// statusText for faulty cross-domain requests
+								try {
+									statusText = xhr.statusText;
+								} catch( e ) {
+									// We normalize with Webkit giving an empty statusText
+									statusText = "";
 								}
-							}
-						} catch( firefoxAccessException ) {
-							if ( !isAbort ) {
-								complete( -1, firefoxAccessException );
+
+								// Filter status for non standard behaviors
+
+								// If the request is local and we have data: assume a success
+								// (success with no data won't get notified, that's the best we
+								// can do given current implementations)
+								if ( !status && options.isLocal && !options.crossDomain ) {
+									status = responses.text ? 200 : 404;
+								// IE - #1450: sometimes returns 1223 when it should be 204
+								} else if ( status === 1223 ) {
+									status = 204;
+								}
 							}
 						}
 
 						// Call complete if needed
 						if ( responses ) {
-							complete( status, statusText, responses, responseHeaders );
+							complete( status, statusText, responses, xhr.getAllResponseHeaders() );
 						}
 					};
 
-					if ( !s.async ) {
+					if ( !options.async ) {
 						// if we're in sync mode we fire the callback
 						callback();
 					} else if ( xhr.readyState === 4 ) {
@@ -9713,18 +9704,8 @@ if ( xhrSupported ) {
 						// retrieved directly we need to fire the callback
 						setTimeout( callback );
 					} else {
-						handle = ++xhrId;
-						if ( xhrOnUnloadAbort ) {
-							// Create the active xhrs callbacks list if needed
-							// and attach the unload handler
-							if ( !xhrCallbacks ) {
-								xhrCallbacks = {};
-								jQuery( window ).unload( xhrOnUnloadAbort );
-							}
-							// Add to list of active xhrs callbacks
-							xhrCallbacks[ handle ] = callback;
-						}
-						xhr.onreadystatechange = callback;
+						// Add to the list of active xhr callbacks
+						xhr.onreadystatechange = xhrCallbacks[ id ] = callback;
 					}
 				},
 
@@ -9736,6 +9717,19 @@ if ( xhrSupported ) {
 			};
 		}
 	});
+}
+
+// Functions to create xhrs
+function createStandardXHR() {
+	try {
+		return new window.XMLHttpRequest();
+	} catch( e ) {}
+}
+
+function createActiveXHR() {
+	try {
+		return new window.ActiveXObject( "Microsoft.XMLHTTP" );
+	} catch( e ) {}
 }
 
 
@@ -10021,8 +10015,8 @@ jQuery.expr.filters.animated = function( elem ) {
 
 
 
-var
-	docElem = window.document.documentElement; // contains
+
+var docElem = window.document.documentElement;
 
 /**
  * Gets a window from an element
@@ -10051,7 +10045,7 @@ jQuery.offset = {
 		curCSSTop = jQuery.css( elem, "top" );
 		curCSSLeft = jQuery.css( elem, "left" );
 		calculatePosition = ( position === "absolute" || position === "fixed" ) &&
-			jQuery.inArray("auto", [curCSSTop, curCSSLeft]) > -1;
+			jQuery.inArray("auto", [ curCSSTop, curCSSLeft ] ) > -1;
 
 		// need to be able to calculate position if either top or left is auto and position is either absolute or fixed
 		if ( calculatePosition ) {
@@ -10170,7 +10164,7 @@ jQuery.fn.extend({
 });
 
 // Create scrollLeft and scrollTop methods
-jQuery.each( {scrollLeft: "pageXOffset", scrollTop: "pageYOffset"}, function( method, prop ) {
+jQuery.each( { scrollLeft: "pageXOffset", scrollTop: "pageYOffset" }, function( method, prop ) {
 	var top = /Y/.test( prop );
 
 	jQuery.fn[ method ] = function( val ) {
@@ -10202,7 +10196,7 @@ jQuery.each( {scrollLeft: "pageXOffset", scrollTop: "pageYOffset"}, function( me
 // rather than make the css module depend on the offset module, we just check for it here
 jQuery.each( [ "top", "left" ], function( i, prop ) {
 	jQuery.cssHooks[ prop ] = addGetHookIf( support.pixelPosition,
-		function ( elem, computed ) {
+		function( elem, computed ) {
 			if ( computed ) {
 				computed = curCSS( elem, prop );
 				// if curCSS returns percentage, fallback to offset
